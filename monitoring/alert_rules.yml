@@ -1,0 +1,104 @@
+groups:
+  - name: lstm_api_alerts
+    rules:
+      - alert: LSTMApiUnavailable
+        expr: up{job="lstm_api"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "API LSTM indisponível"
+          description: "O Prometheus não consegue coletar a API há 2 minutos."
+
+      - alert: LSTMModelNotReady
+        expr: lstm_model_ready == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Modelo LSTM não está pronto"
+          description: "Modelo, scaler ou metadados não foram carregados."
+
+      - alert: LSTMApiHighP95Latency
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(
+              rate(
+                lstm_api_http_request_duration_seconds_bucket{
+                  path="/predict"
+                }[5m]
+              )
+            ) by (le)
+          ) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Latência p95 elevada"
+          description: "A latência p95 do /predict está acima de 500 ms."
+
+      - alert: LSTMApiHighServerErrorRate
+        expr: |
+          (
+            sum(
+              rate(
+                lstm_api_http_requests_total{
+                  path="/predict",
+                  status=~"5.."
+                }[5m]
+              )
+            )
+            /
+            clamp_min(
+              sum(
+                rate(
+                  lstm_api_http_requests_total{
+                    path="/predict"
+                  }[5m]
+                )
+              ),
+              0.001
+            )
+          ) > 0.01
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Taxa de erros 5xx elevada"
+          description: "Mais de 1% das chamadas de previsão retornaram 5xx."
+
+      - alert: LSTMApiHighNormalizedCPU
+        expr: lstm_api_process_cpu_normalized_percent > 90
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "CPU elevada na API"
+          description: "A CPU normalizada do processo está acima de 90%."
+
+      - alert: LSTMApiHighMemory
+        expr: lstm_api_process_resident_memory_bytes > 1610612736
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Memória elevada na API"
+          description: "O processo da API está utilizando mais de 1,5 GiB."
+
+      - alert: LSTMModelHighPredictionError
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(
+              rate(
+                lstm_model_absolute_percentage_error_bucket[1h]
+              )
+            ) by (le)
+          ) > 5
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Erro preditivo elevado"
+          description: "O erro percentual absoluto p95 está acima de 5%."
