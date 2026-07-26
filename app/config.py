@@ -16,7 +16,7 @@ class Settings:
     app_version: str
 
     @classmethod
-    def from_env(cls) -> "Settings":
+    def from_env(cls) -> Settings:
         return cls(
             model_path=Path(
                 os.getenv("MODEL_PATH", "models/lstm_final.keras")

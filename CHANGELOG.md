@@ -51,6 +51,10 @@ organizadas por data.
   que não ilustra o propósito do endpoint. O exemplo passou a usar o
   D+1 devolvido pelo exemplo de `PredictRequest` (297.71) contra um
   preço observado de 298.01, e os dois campos ganharam descrição.
+- `make lint` falhava com quatro violações pré-existentes em `app/`
+  (`UP037`, `UP035` e dois `I001`). Corrigidas: anotação de retorno
+  sem aspas em `Settings.from_env`, `Iterable` importado de
+  `collections.abc` e ordenação dos blocos de import.
 
 ## [2026-07-14]
 

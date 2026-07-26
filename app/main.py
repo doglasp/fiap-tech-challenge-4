@@ -38,7 +38,6 @@ from app.schemas import (
     PredictResponse,
 )
 
-
 LOGGER = logging.getLogger("lstm_api")
 logging.basicConfig(
     level=logging.INFO,

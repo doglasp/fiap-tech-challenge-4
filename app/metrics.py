@@ -10,7 +10,6 @@ from prometheus_client import (
     Histogram,
 )
 
-
 REGISTRY = CollectorRegistry()
 
 HTTP_REQUESTS_TOTAL = Counter(

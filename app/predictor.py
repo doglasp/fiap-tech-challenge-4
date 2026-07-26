@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Iterable
 from contextlib import nullcontext
 from pathlib import Path
 from threading import Lock
-from typing import Iterable
 
 import joblib
 import numpy as np
