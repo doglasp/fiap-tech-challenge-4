@@ -2,3 +2,9 @@
 httpx>=0.28,<1
 pytest>=8,<10
 ruff>=0.9,<1
+
+# Necessários para treinar nos notebooks e para exportar o modelo com
+# scripts/export_onnx.py. Ficam fora da imagem de produção.
+tensorflow-cpu==2.21.0
+tf2onnx>=1.16,<2
+onnx>=1.16,<2

@@ -39,6 +39,71 @@ organizadas por data.
 
 ### Alterado
 
+- A API passou a servir o modelo em **ONNX** em vez de TensorFlow. O
+  `.keras` continua sendo o artefato de origem, treinado pelo notebook
+  02; o `models/lstm_final.onnx` é derivado dele e é o que o
+  `Predictor` carrega.
+
+  O TensorFlow custava 1,9 GB instalados para chamar `model(x)` numa
+  LSTM de 66 mil parâmetros. Tirá-lo do runtime muda a escala do que dá
+  para hospedar:
+
+  | | TensorFlow | ONNX |
+  |---|---|---|
+  | Imagem Docker | 1,64 GB | 495 MB |
+  | Memória residente | 722 MB | 159 MB |
+  | Artefato | 818 KB | 268 KB |
+
+  Camadas gratuitas de hospedagem costumam limitar o contêiner a
+  512 MB, onde a versão com TensorFlow não subia.
+
+  O modelo **não** foi retreinado e as previsões não mudam de forma
+  observável: `horizon=1` devolve 297.7094433579125 contra
+  297.7094437898493, diferença relativa de 1,5e-09, e `horizon=30`
+  termina em 311.714681 contra 311.714682, após 30 passos recursivos.
+
+  `scripts/export_onnx.py` é a receita reproduzível da conversão e
+  verifica a equivalência em 512 janelas aleatórias, abortando se a
+  diferença passar de `1e-4` — hoje ela é de 3,7e-07.
+
+  `requirements.txt` troca `tensorflow-cpu` por `onnxruntime`; o
+  TensorFlow e o `tf2onnx` migraram para `requirements-dev.txt`, já que
+  treinar e exportar acontecem fora da imagem. As variáveis
+  `TF_NUM_INTRAOP_THREADS` e `TF_NUM_INTEROP_THREADS` viraram
+  `ORT_NUM_INTRAOP_THREADS` e `ORT_NUM_INTEROP_THREADS`.
+- O `Dockerfile` fixava a porta 8000 e criava o usuário com UID 10001.
+  Passou a ler `$PORT`, que as plataformas de hospedagem injetam, e a
+  usar UID 1000, que é o esperado por elas. Os `COPY` ganharam
+  `--chown`, evitando um `chown` recursivo que duplicaria os arquivos
+  numa camada extra.
+
+  O `CMD` está em forma shell para expandir `$PORT`, com `exec` para
+  que os sinais cheguem ao uvicorn: verificado com `docker stop`
+  encerrando em 0,7 s e código de saída 0.
+- O `Predictor` chamava o modelo em modo eager dentro do laço de
+  inferência recursiva, pagando centenas de milissegundos de overhead
+  do Keras por passo do horizonte. A chamada passou a ser compilada
+  com `tf.function` e assinatura de entrada fixa `(1, janela, 1)`,
+  que evita retracing entre requisições; o `warm_up` dispara o tracing
+  na inicialização.
+
+  Medido com a mesma entrada, mediana de execuções após aquecimento:
+
+  | Caminho | Antes | Depois |
+  |---|---|---|
+  | `predict(horizon=1)` | 194,3 ms | 8,8 ms |
+  | `predict(horizon=30)` | 5126,3 ms | 243,5 ms |
+
+  Fim a fim pela API, incluindo HTTP: 12,8 ms em D+1 e 208 ms em D+30.
+  Isso importa porque a regra `LSTMApiHighP95Latency` dispara com p95
+  do `/predict` acima de 0,5 s — com `horizon=30` a API levava dez
+  vezes o limiar que ela mesma monitora.
+
+  As previsões não mudam: `horizon=1` devolve os mesmos
+  297.7094437898493 de antes, e `horizon=30` termina no mesmo
+  311.714682. A entrada passou a ser convertida para `float32`, exigido
+  pela assinatura do grafo, sem perda adicional porque os pesos já são
+  `float32`.
 - O `/predict` devolvia sempre `"symbol": "AAPL"`, vindo do
   `inference_meta`, independentemente dos preços recebidos. Como o
   modelo consome log-retornos, que são adimensionais, a API aceita a

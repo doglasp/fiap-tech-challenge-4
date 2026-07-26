@@ -44,7 +44,8 @@ clonar para executar a API:
 
 ```text
 models/
-└── lstm_final.keras
+├── lstm_final.keras   ← treinado pelo notebook 02
+└── lstm_final.onnx    ← servido pela API
 
 artifacts/
 ├── ret_scaler.pkl
@@ -53,17 +54,38 @@ artifacts/
 └── AAPL_clean.csv
 ```
 
-A API utiliza o modelo, o scaler e os metadados. O `metrics.pkl`
-guarda a avaliação do modelo — métricas de preço, comparação com o
-baseline naïve e diagnósticos no espaço de retorno, descritos em
-[artifacts/README.md](artifacts/README.md) — e o CSV serve aos
-exemplos e ao teste de carga.
+A API carrega o **ONNX**, não o `.keras`. O `.keras` é o artefato de
+origem, produzido pelo treino; o `.onnx` é derivado dele e serve à
+inferência, o que tira o TensorFlow da imagem de produção:
+
+| | TensorFlow (`.keras`) | ONNX (`.onnx`) |
+|---|---|---|
+| Imagem Docker | 1,64 GB | **495 MB** |
+| Memória residente | 722 MB | **159 MB** |
+| Artefato | 818 KB | 268 KB |
+
+O `metrics.pkl` guarda a avaliação do modelo — métricas de preço,
+comparação com o baseline naïve e diagnósticos no espaço de retorno,
+descritos em [artifacts/README.md](artifacts/README.md) — e o CSV
+serve aos exemplos e ao teste de carga.
 
 Para regerá-los do zero, execute os notebooks 01 e 02 **nessa ordem**:
 o 01 concentra todo o pré-processamento e grava os arrays de treino
 que o 02 consome, sem repetir nenhuma transformação. Esses arrays
 intermediários não são versionados, então o 02 não roda sozinho num
 clone novo.
+
+Depois de retreinar, **reexporte o ONNX**, senão a API continua
+servindo o modelo antigo:
+
+```bash
+pip install -r requirements-dev.txt
+python scripts/export_onnx.py
+```
+
+O script converte o `.keras` e verifica a equivalência em 512 janelas
+aleatórias, abortando se a diferença passar de `1e-4`. Na versão atual
+a diferença máxima é de `3.7e-07`.
 
 ## 2. Execução local sem Docker
 
@@ -262,7 +284,7 @@ conecte um Alertmanager.
 ## 6. Testes automatizados
 
 Os testes usam um predictor falso, portanto não precisam carregar o
-TensorFlow nem o arquivo `.keras`.
+runtime de inferência nem o arquivo do modelo.
 
 ```bash
 pip install -r requirements-dev.txt
@@ -287,12 +309,35 @@ O contêiner usa um único worker do Uvicorn porque:
 - cada processo mantém uma cópia do modelo em memória;
 - o cliente Python do Prometheus exige configuração especial para
   métricas multiprocess;
-- a inferência é serializada por processo para evitar concorrência
-  imprevisível no TensorFlow.
+- a inferência é serializada por processo, para que a sessão ONNX não
+  receba chamadas concorrentes.
 
 Para aumentar capacidade, prefira réplicas do contêiner atrás de um
-balanceador de carga. Ajuste `TF_NUM_INTRAOP_THREADS` e
-`TF_NUM_INTEROP_THREADS` com base nos testes do ambiente.
+balanceador de carga. Ajuste `ORT_NUM_INTRAOP_THREADS` e
+`ORT_NUM_INTEROP_THREADS` com base nos testes do ambiente.
+
+Medido nesta máquina com o `load_test.py`, sem erros em nenhum caso:
+
+| Cenário | Throughput | p95 |
+|---|---|---|
+| 200 req, concorrência 10, D+1 | 236 req/s | 76 ms |
+| 60 req, concorrência 10, D+30 | 58 req/s | 188 ms |
+
+Ambos ficam abaixo do limiar de 0,5 s da regra `LSTMApiHighP95Latency`.
+
+## 8.1 Publicar em nuvem
+
+O contêiner lê a porta de `$PORT` (padrão 8000) e roda como UID 1000,
+que é o esperado pelas plataformas de hospedagem. Com 495 MB de imagem
+e 159 MB de memória residente, cabe nas camadas gratuitas que limitam
+o contêiner a 512 MB.
+
+```bash
+docker run -e PORT=7860 -p 7860:7860 lstm-api:onnx
+```
+
+Só a API sobe: Prometheus e Grafana continuam no `docker-compose.yml`
+local, então o `/metrics` fica exposto mas sem coletor em nuvem.
 
 ## 9. Checklist da entrega
 
@@ -318,9 +363,9 @@ evitar commits acidentais de execuções locais. Ao regerar os
 artefatos e desejar publicá-los, force a inclusão:
 
 ```bash
-git add -f models/lstm_final.keras artifacts/*.pkl artifacts/*.csv
+git add -f models/lstm_final.keras models/lstm_final.onnx artifacts/*.pkl artifacts/*.csv
 ```
 
-Os arquivos atuais são pequenos (o `.keras` tem cerca de 800 KB) e
-cabem no Git comum. Para modelos maiores, prefira Git LFS, uma
-release do GitHub ou um armazenamento de objetos.
+Os arquivos atuais são pequenos (o `.keras` tem cerca de 800 KB e o
+`.onnx`, 270 KB) e cabem no Git comum. Para modelos maiores, prefira
+Git LFS, uma release do GitHub ou um armazenamento de objetos.

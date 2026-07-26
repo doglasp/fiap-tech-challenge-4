@@ -5,13 +5,12 @@ services:
       dockerfile: Dockerfile
     container_name: lstm-api
     environment:
-      MODEL_PATH: /opt/lstm-api/models/lstm_final.keras
+      MODEL_PATH: /opt/lstm-api/models/lstm_final.onnx
       SCALER_PATH: /opt/lstm-api/artifacts/ret_scaler.pkl
       META_PATH: /opt/lstm-api/artifacts/inference_meta.pkl
       RESOURCE_SAMPLE_SECONDS: "5"
-      TF_CPP_MIN_LOG_LEVEL: "2"
-      TF_NUM_INTRAOP_THREADS: "${TF_NUM_INTRAOP_THREADS:-2}"
-      TF_NUM_INTEROP_THREADS: "${TF_NUM_INTEROP_THREADS:-1}"
+      ORT_NUM_INTRAOP_THREADS: "${ORT_NUM_INTRAOP_THREADS:-2}"
+      ORT_NUM_INTEROP_THREADS: "${ORT_NUM_INTEROP_THREADS:-1}"
     volumes:
       - ./models:/opt/lstm-api/models:ro
       - ./artifacts:/opt/lstm-api/artifacts:ro
