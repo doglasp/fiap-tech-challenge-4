@@ -142,39 +142,101 @@ docker compose logs -f api
 
 ## 4. Endpoints
 
+| Método | Rota | Função |
+|---|---|---|
+| `GET` | `/` | índice com links para os demais recursos |
+| `GET` | `/health` | estado da aplicação e uso de recursos; sempre HTTP 200 |
+| `GET` | `/ready` | prontidão do modelo; HTTP 503 enquanto não carregou |
+| `POST` | `/predict` | previsão de preços a partir de fechamentos |
+| `POST` | `/feedback` | registra o preço observado para medir o erro |
+| `GET` | `/metrics/` | métricas no formato Prometheus |
+| `GET` | `/docs` | documentação interativa (Swagger) |
+
+A barra final de `/metrics/` importa: o endpoint é montado como uma
+sub-aplicação, então `/metrics` sem barra apenas redireciona.
+
+### Índice
+
+```bash
+curl http://localhost:8000/
+```
+
+```json
+{
+  "name": "Tech Challenge Fase 4 — API de Previsão LSTM",
+  "version": "2.0.0",
+  "docs": "/docs",
+  "health": "/health",
+  "readiness": "/ready",
+  "metrics": "/metrics/"
+}
+```
+
 ### Saúde
 
 ```bash
 curl http://localhost:8000/health
 ```
 
-O endpoint pode retornar `degraded` quando algum artefato estiver
-ausente. O `/ready` retorna HTTP 503 até que o modelo esteja pronto.
+```json
+{
+  "status": "ok",
+  "model_ready": true,
+  "model_trained_on": "AAPL",
+  "window_size": 60,
+  "min_prices": 61,
+  "resources": {
+    "system_cpu_percent": 0.0,
+    "system_memory_percent": 51.8,
+    "process_cpu_percent": 0.2,
+    "process_cpu_normalized_percent": 0.025,
+    "process_rss_mb": 158.9
+  },
+  "startup_error": null
+}
+```
+
+O `/health` responde HTTP 200 mesmo com o modelo indisponível: nesse
+caso `status` vira `degraded`, `model_ready` vira `false` e
+**`startup_error` traz a exceção que impediu o carregamento** — é o
+primeiro lugar a olhar quando a API sobe sem servir previsões.
+
+O `/ready` é o oposto: só responde 200 quando o modelo está pronto, e
+HTTP 503 enquanto não estiver. Use-o como *readiness probe*.
 
 ```bash
 curl http://localhost:8000/ready
 ```
 
-### Previsão
-
-A quantidade mínima de preços é informada por `/health` e
-`/ready`. No modelo atual, a janela é 60, portanto são necessários
-pelo menos 61 fechamentos.
-
-```bash
-curl -X POST http://localhost:8000/predict       -H "Content-Type: application/json"       -d '{
-    "prices": [
-      270.10, 271.30, 270.85, 272.12, 273.04,
-      272.80, 274.15, 275.01, 274.60, 276.20
-    ],
-    "horizon": 1,
-    "symbol": "AAPL"
-  }'
+```json
+{
+  "status": "ready",
+  "model_loaded": true,
+  "scaler_loaded": true,
+  "model_trained_on": "AAPL",
+  "window_size": 60,
+  "min_prices": 61
+}
 ```
 
-O exemplo acima é ilustrativo e precisa ser ampliado até a
-quantidade mínima exigida pelo modelo. O Swagger já traz um exemplo
-completo, com os 61 fechamentos.
+### Previsão
+
+A quantidade mínima de preços é informada por `/health` e `/ready` no
+campo `min_prices`. No modelo atual a janela é 60, portanto são
+necessários pelo menos 61 fechamentos.
+
+O comando abaixo monta o corpo com os 61 últimos fechamentos do CSV
+versionado, evitando montar a lista à mão. Rode-o a partir da raiz do
+projeto, com o ambiente da seção 2 ativado — fora dele, troque
+`python` por `python3`:
+
+```bash
+python -c "import csv,json;r=list(csv.DictReader(open('artifacts/AAPL_clean.csv')));print(json.dumps({'prices':[round(float(x['Close']),2) for x in r[-61:]],'horizon':1,'symbol':'AAPL'}))" > /tmp/payload.json
+curl -X POST http://localhost:8000/predict -H "Content-Type: application/json" -d @/tmp/payload.json
+```
+
+O Swagger também traz um exemplo completo já preenchido, bastando
+clicar em *Try it out*.
 
 Resposta:
 
@@ -186,6 +248,48 @@ Resposta:
   "horizon": 1,
   "predictions": [297.71]
 }
+```
+
+### Erros de validação
+
+O `/predict` recusa entradas inválidas com HTTP 422, mas **o campo
+`detail` tem dois formatos diferentes**, conforme onde a validação
+falhou. Quem consome a API programaticamente precisa tratar os dois.
+
+Regras de schema — tamanho, sinal e faixa — são verificadas pelo
+Pydantic, e o `detail` vem como **lista de objetos**:
+
+```json
+{
+  "detail": [
+    {
+      "type": "less_than_equal",
+      "loc": ["body", "horizon"],
+      "msg": "Input should be less than or equal to 30",
+      "input": 99
+    }
+  ]
+}
+```
+
+Regras que dependem do modelo carregado — como a quantidade mínima de
+preços, que varia com a janela — são verificadas pelo `Predictor`, e o
+`detail` vem como **string**:
+
+```json
+{
+  "detail": "São necessários pelo menos 61 preços (janela=60); recebidos 3."
+}
+```
+
+Um cliente robusto deve checar o tipo antes de exibir a mensagem:
+
+```python
+detalhe = resposta.json()["detail"]
+if isinstance(detalhe, list):
+    mensagens = [erro["msg"] for erro in detalhe]
+else:
+    mensagens = [detalhe]
 ```
 
 ### Sobre os campos `symbol` e `model_trained_on`
