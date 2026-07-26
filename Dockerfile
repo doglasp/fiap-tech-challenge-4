@@ -5,7 +5,7 @@ ENV PYTHONDONTWRITEBYTECODE=1         PYTHONUNBUFFERED=1         PIP_NO_CACHE_DI
 WORKDIR /opt/lstm-api
 
 COPY requirements.txt .
-RUN python -m pip install --upgrade pip         && python -m pip install -r requirements.txt
+RUN python -m pip install --upgrade pip         && python -m pip install -r requirements.txt         && rm -rf /usr/local/lib/python3.12/site-packages/tensorflow/include
 
 COPY app ./app
 COPY models ./models

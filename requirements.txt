@@ -1,7 +1,9 @@
 fastapi>=0.115,<1.0
 uvicorn[standard]>=0.32,<1.0
 pydantic>=2.9,<3
-tensorflow==2.21.0
+# tensorflow-cpu evita as bibliotecas CUDA da NVIDIA, inúteis para a
+# inferência em CPU e que pesam bastante na imagem final.
+tensorflow-cpu==2.21.0
 numpy>=2.0,<2.4
 joblib>=1.4,<2
 scikit-learn>=1.5,<2
