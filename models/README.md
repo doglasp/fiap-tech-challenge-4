@@ -1,8 +1,8 @@
 # Modelo treinado
 
-Copie para esta pasta o modelo gerado pelo notebook 02:
+Esta pasta já contém o modelo versionado no repositório:
 
-- `lstm_final.keras`
+- `lstm_final.keras` — gerado pelo notebook 02
 
 Para armazenar modelos grandes no Git, prefira Git LFS ou um
 repositório de artefatos.

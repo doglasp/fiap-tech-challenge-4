@@ -37,10 +37,10 @@ preço_previsto = preço_anterior × exp(retorno_previsto)
 └── requirements-dev.txt
 ```
 
-## 1. Gerar o modelo e os artefatos
+## 1. Modelo e artefatos
 
-Execute os notebooks 01 e 02 na ordem. Ao final, a raiz do projeto
-precisa conter:
+Os arquivos abaixo já vêm versionados no repositório, então basta
+clonar para executar a API:
 
 ```text
 models/
@@ -49,11 +49,15 @@ models/
 artifacts/
 ├── ret_scaler.pkl
 ├── inference_meta.pkl
+├── metrics.pkl
 └── AAPL_clean.csv
 ```
 
-O CSV é necessário apenas para os exemplos e o teste de carga. A
-API utiliza o modelo, o scaler e os metadados.
+A API utiliza o modelo, o scaler e os metadados. O `metrics.pkl`
+guarda as métricas de avaliação e o CSV serve aos exemplos e ao
+teste de carga.
+
+Para regerá-los do zero, execute os notebooks 01 e 02 na ordem.
 
 ## 2. Execução local sem Docker
 
@@ -239,6 +243,18 @@ balanceador de carga. Ajuste `TF_NUM_INTRAOP_THREADS` e
 
 ## Observação sobre os artefatos
 
-O `.gitignore` não versiona automaticamente os arquivos de modelo e
-os artefatos binários. Para incluí-los no repositório, utilize Git
-LFS, uma release do Git ou um armazenamento de objetos.
+O modelo e os artefatos de inferência **já estão versionados** neste
+repositório, portanto a API funciona logo após o clone, sem executar
+os notebooks.
+
+O `.gitignore` continua ignorando `models/*` e `artifacts/*` para
+evitar commits acidentais de execuções locais. Ao regerar os
+artefatos e desejar publicá-los, force a inclusão:
+
+```bash
+git add -f models/lstm_final.keras artifacts/*.pkl artifacts/*.csv
+```
+
+Os arquivos atuais são pequenos (o `.keras` tem cerca de 800 KB) e
+cabem no Git comum. Para modelos maiores, prefira Git LFS, uma
+release do GitHub ou um armazenamento de objetos.
