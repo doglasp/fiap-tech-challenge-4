@@ -27,6 +27,7 @@ class PredictRequest(BaseModel):
                     298.01,
                 ],
                 "horizon": 1,
+                "symbol": "AAPL",
             }
         }
     )
@@ -48,6 +49,28 @@ class PredictRequest(BaseModel):
             "Quantidade de dias previstos recursivamente."
         ),
     )
+    symbol: str | None = Field(
+        default=None,
+        max_length=20,
+        description=(
+            "Ação a que os preços se referem. É opcional e serve "
+            "apenas para rotular a resposta: o modelo carregado é "
+            "utilizado de qualquer forma. Consulte "
+            "'model_trained_on' na resposta para saber em qual ação "
+            "esse modelo foi treinado."
+        ),
+    )
+
+    @field_validator("symbol")
+    @classmethod
+    def normalize_symbol(
+        cls,
+        value: str | None,
+    ) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip().upper()
+        return normalized or None
 
     @field_validator("prices")
     @classmethod
@@ -67,7 +90,23 @@ class PredictRequest(BaseModel):
 
 
 class PredictResponse(BaseModel):
-    symbol: str | None
+    # 'symbol' descreve a ação que a requisição diz representar e
+    # 'model_trained_on' descreve o modelo que produziu a previsão.
+    # Quando divergem, o modelo está sendo aplicado a uma ação
+    # diferente da que viu no treino — e isso precisa ficar visível
+    # em vez de ser mascarado por um único campo.
+    symbol: str | None = Field(
+        default=None,
+        description=(
+            "Ação informada na requisição. Nulo quando não informada."
+        ),
+    )
+    model_trained_on: str | None = Field(
+        default=None,
+        description=(
+            "Ação em que o modelo carregado foi treinado."
+        ),
+    )
     last_price: float
     horizon: int
     predictions: list[float]
@@ -111,7 +150,7 @@ class FeedbackResponse(BaseModel):
 class HealthResponse(BaseModel):
     status: Literal["ok", "degraded"]
     model_ready: bool
-    symbol: str | None
+    model_trained_on: str | None
     window_size: int | None
     min_prices: int | None
     resources: dict[str, float]

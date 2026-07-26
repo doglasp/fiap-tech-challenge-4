@@ -27,6 +27,28 @@ organizadas por data.
 
 ### Alterado
 
+- O `/predict` devolvia sempre `"symbol": "AAPL"`, vindo do
+  `inference_meta`, independentemente dos preços recebidos. Como o
+  modelo consome log-retornos, que são adimensionais, a API aceita a
+  série de qualquer ação — e rotulava todas como AAPL.
+
+  A resposta passou a separar `symbol`, a ação que a requisição diz
+  representar, de `model_trained_on`, a ação em que o modelo foi
+  treinado. Quando divergem, o modelo está sendo aplicado a uma ação
+  diferente da que viu no treino, e isso fica explícito. O
+  `PredictRequest` ganhou um campo opcional `symbol`, normalizado para
+  maiúsculas sem espaços, que apenas rotula a resposta: não troca de
+  modelo nem altera a previsão.
+
+  Em `/health` e `/ready` o campo `symbol` virou `model_trained_on`.
+  Quebra de contrato para quem lia esses campos; o `load_test.py`
+  consome apenas `min_prices`, que não mudou.
+
+  Os notebooks 03 e 04 não importam de `app/`: mantêm cópias próprias
+  da API para ficarem autocontidos, e por isso seguem executando sem
+  erro, mas as saídas gravadas neles ainda exibem o campo `symbol`
+  antigo. Alinhá-los exige reexecutar os dois notebooks, e não apenas
+  editar as células.
 - Todo o pré-processamento passou a viver no notebook 01. Antes o 01
   escalonava preços com `MinMaxScaler` e gravava janelas que o 02
   nunca lia: o 02 recarregava o CSV e refazia tudo com log-retorno e

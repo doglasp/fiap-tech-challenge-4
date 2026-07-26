@@ -40,8 +40,9 @@ def test_health_and_readiness():
 
     assert health.status_code == 200
     assert health.json()["model_ready"] is True
+    assert health.json()["model_trained_on"] == "TEST"
     assert ready.status_code == 200
-    assert ready.json()["symbol"] == "TEST"
+    assert ready.json()["model_trained_on"] == "TEST"
 
 
 def test_predict():
@@ -59,6 +60,41 @@ def test_predict():
         13.0,
         14.0,
     ]
+
+
+def test_predict_omits_symbol_when_not_informed():
+    """Sem 'symbol' na requisição a API não deve inventar um."""
+
+    with make_client() as client:
+        response = client.post(
+            "/predict",
+            json={
+                "prices": [10, 11, 12],
+                "horizon": 1,
+            },
+        )
+
+    body = response.json()
+    assert body["symbol"] is None
+    assert body["model_trained_on"] == "TEST"
+
+
+def test_predict_echoes_symbol_normalized():
+    """A ação informada é devolvida sem se confundir com a do modelo."""
+
+    with make_client() as client:
+        response = client.post(
+            "/predict",
+            json={
+                "prices": [10, 11, 12],
+                "horizon": 1,
+                "symbol": " petr4 ",
+            },
+        )
+
+    body = response.json()
+    assert body["symbol"] == "PETR4"
+    assert body["model_trained_on"] == "TEST"
 
 
 def test_predict_rejects_short_history():

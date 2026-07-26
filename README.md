@@ -145,23 +145,45 @@ curl -X POST http://localhost:8000/predict       -H "Content-Type: application/j
       270.10, 271.30, 270.85, 272.12, 273.04,
       272.80, 274.15, 275.01, 274.60, 276.20
     ],
-    "horizon": 1
+    "horizon": 1,
+    "symbol": "AAPL"
   }'
 ```
 
 O exemplo acima é ilustrativo e precisa ser ampliado até a
-quantidade mínima exigida pelo modelo.
+quantidade mínima exigida pelo modelo. O Swagger já traz um exemplo
+completo, com os 61 fechamentos.
 
 Resposta:
 
 ```json
 {
   "symbol": "AAPL",
+  "model_trained_on": "AAPL",
   "last_price": 298.01,
   "horizon": 1,
   "predictions": [297.71]
 }
 ```
+
+### Sobre os campos `symbol` e `model_trained_on`
+
+O modelo consome **log-retornos**, que são adimensionais, portanto a
+API aceita a série de qualquer ação — não há restrição a um conjunto
+predefinido de papéis.
+
+Por isso a resposta separa duas informações que não devem ser
+confundidas:
+
+- `symbol` é a ação que a requisição diz representar. É opcional e
+  meramente informativo; quando omitido, volta nulo, pois a API não
+  tem como deduzir a origem dos preços.
+- `model_trained_on` é a ação em que o modelo carregado foi treinado.
+
+Quando os dois divergem, o modelo está sendo aplicado a uma ação
+diferente da que viu no treino. A previsão é produzida mesmo assim,
+mas a divergência fica explícita na resposta e deve ser levada em
+conta na interpretação do resultado.
 
 ### Feedback da previsão
 

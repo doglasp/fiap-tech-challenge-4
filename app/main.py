@@ -229,7 +229,7 @@ def create_app(
         return HealthResponse(
             status="ok" if ready else "degraded",
             model_ready=ready,
-            symbol=getattr(
+            model_trained_on=getattr(
                 current_predictor,
                 "symbol",
                 None,
@@ -283,7 +283,7 @@ def create_app(
                 )
                 is not None
             ),
-            "symbol": current_predictor.symbol,
+            "model_trained_on": current_predictor.symbol,
             "window_size": current_predictor.window,
             "min_prices": current_predictor.min_prices,
         }
@@ -336,7 +336,8 @@ def create_app(
         )
 
         return PredictResponse(
-            symbol=current_predictor.symbol,
+            symbol=request_body.symbol,
+            model_trained_on=current_predictor.symbol,
             last_price=last_price,
             horizon=request_body.horizon,
             predictions=[
