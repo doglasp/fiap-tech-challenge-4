@@ -26,6 +26,28 @@ def _configure_tensorflow_threads(tf_module) -> None:
         )
 
 
+def _build_inference_fn(tf_module, model, window: int):
+    """Compila a chamada do modelo para uma janela de tamanho fixo.
+
+    Chamar o modelo em modo eager custa centenas de milissegundos de
+    overhead por passo, o que a inferência recursiva multiplica pelo
+    horizonte. A assinatura fixa evita retracing entre requisições.
+    """
+
+    signature = [
+        tf_module.TensorSpec(
+            shape=(1, window, 1),
+            dtype=tf_module.float32,
+        )
+    ]
+
+    @tf_module.function(input_signature=signature)
+    def infer(model_input):
+        return model(model_input, training=False)
+
+    return infer
+
+
 class Predictor:
     """Carrega os artefatos e executa inferência recursiva."""
 
@@ -78,6 +100,7 @@ class Predictor:
                 "O scaler não possui o método inverse_transform."
             )
 
+        self._infer = _build_inference_fn(tf, self.model, self.window)
         self._lock = Lock() if serialize_inference else None
 
     @property
@@ -87,13 +110,13 @@ class Predictor:
         return self.window + 1
 
     def warm_up(self) -> None:
-        """Inicializa o grafo antes da primeira requisição real."""
+        """Dispara o tracing do grafo antes da primeira requisição real."""
 
         sample = np.zeros((1, self.window, 1), dtype=np.float32)
         context = self._lock if self._lock is not None else nullcontext()
 
         with context:
-            self.model(sample, training=False)
+            self._infer(sample)
 
     def predict(
         self,
@@ -140,15 +163,14 @@ class Predictor:
         # TensorFlow. Para maior vazão, escale réplicas da API.
         with context:
             for _ in range(int(horizon)):
+                # float32 é exigido pela assinatura do grafo compilado;
+                # os pesos já são float32, então não há perda adicional.
                 model_input = window_scaled.reshape(
                     1,
                     self.window,
                     1,
-                )
-                prediction_tensor = self.model(
-                    model_input,
-                    training=False,
-                )
+                ).astype(np.float32)
+                prediction_tensor = self._infer(model_input)
                 scaled_return = float(
                     np.asarray(prediction_tensor).reshape(-1)[0]
                 )

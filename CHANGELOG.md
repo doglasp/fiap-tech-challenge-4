@@ -39,6 +39,30 @@ organizadas por data.
 
 ### Alterado
 
+- O `Predictor` chamava o modelo em modo eager dentro do laço de
+  inferência recursiva, pagando centenas de milissegundos de overhead
+  do Keras por passo do horizonte. A chamada passou a ser compilada
+  com `tf.function` e assinatura de entrada fixa `(1, janela, 1)`,
+  que evita retracing entre requisições; o `warm_up` dispara o tracing
+  na inicialização.
+
+  Medido com a mesma entrada, mediana de execuções após aquecimento:
+
+  | Caminho | Antes | Depois |
+  |---|---|---|
+  | `predict(horizon=1)` | 194,3 ms | 8,8 ms |
+  | `predict(horizon=30)` | 5126,3 ms | 243,5 ms |
+
+  Fim a fim pela API, incluindo HTTP: 12,8 ms em D+1 e 208 ms em D+30.
+  Isso importa porque a regra `LSTMApiHighP95Latency` dispara com p95
+  do `/predict` acima de 0,5 s — com `horizon=30` a API levava dez
+  vezes o limiar que ela mesma monitora.
+
+  As previsões não mudam: `horizon=1` devolve os mesmos
+  297.7094437898493 de antes, e `horizon=30` termina no mesmo
+  311.714682. A entrada passou a ser convertida para `float32`, exigido
+  pela assinatura do grafo, sem perda adicional porque os pesos já são
+  `float32`.
 - O `/predict` devolvia sempre `"symbol": "AAPL"`, vindo do
   `inference_meta`, independentemente dos preços recebidos. Como o
   modelo consome log-retornos, que são adimensionais, a API aceita a
