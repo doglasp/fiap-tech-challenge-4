@@ -57,10 +57,15 @@ organizadas por data.
   consome apenas `min_prices`, que não mudou.
 
   Os notebooks 03 e 04 não importam de `app/`: mantêm cópias próprias
-  da API para ficarem autocontidos, e por isso seguem executando sem
-  erro, mas as saídas gravadas neles ainda exibem o campo `symbol`
-  antigo. Alinhá-los exige reexecutar os dois notebooks, e não apenas
-  editar as células.
+  da API para ficarem autocontidos. As duas cópias foram alinhadas ao
+  contrato novo, incluindo o `model_trained_on` no `/ready` do 04.
+
+  O notebook 03 foi reexecutado e traz as saídas reais do contrato
+  novo. No 04 apenas a saída da célula do `TestClient` foi limpa, em
+  vez de reexecutada: o notebook mede throughput, latência, CPU e
+  memória, e uma nova execução substituiria os gráficos e todos os
+  números de performance pelos da máquina atual, o que vai além de
+  alinhar o contrato. Basta reexecutar a célula para repovoá-la.
 - O campo `horizon` aceitava até 30 dias sem informar que a avaliação
   cobria somente D+1. A descrição no Swagger e o README passaram a
   registrar a degradação medida: MAPE de 1,2% em D+1, 3,1% em D+5 e
