@@ -46,6 +46,11 @@ organizadas por data.
   exemplo passou a conter os 61 fechamentos reais que o modelo atual
   exige, e a descrição do campo `prices` aponta para o `min_prices`
   do `/ready`.
+- `FeedbackRequest` não declarava exemplo, então o Swagger montava um
+  a partir do `gt=0` e exibia `1` nos dois campos — erro absoluto zero,
+  que não ilustra o propósito do endpoint. O exemplo passou a usar o
+  D+1 devolvido pelo exemplo de `PredictRequest` (297.71) contra um
+  preço observado de 298.01, e os dois campos ganharam descrição.
 
 ## [2026-07-14]
 

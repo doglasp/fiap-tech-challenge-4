@@ -74,8 +74,33 @@ class PredictResponse(BaseModel):
 
 
 class FeedbackRequest(BaseModel):
-    predicted_price: float = Field(..., gt=0)
-    actual_price: float = Field(..., gt=0)
+    # Sem exemplo explícito o Swagger monta um a partir do gt=0 e
+    # exibe 1 nos dois campos, o que produz erro zero. O exemplo usa
+    # o D+1 devolvido pelo exemplo de PredictRequest (297.71) e um
+    # preço observado plausível, como no README.
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "predicted_price": 297.71,
+                "actual_price": 298.01,
+            }
+        }
+    )
+
+    predicted_price: float = Field(
+        ...,
+        gt=0,
+        description=(
+            "Preço devolvido anteriormente por /predict."
+        ),
+    )
+    actual_price: float = Field(
+        ...,
+        gt=0,
+        description=(
+            "Preço de fechamento realmente observado no dia previsto."
+        ),
+    )
 
 
 class FeedbackResponse(BaseModel):
