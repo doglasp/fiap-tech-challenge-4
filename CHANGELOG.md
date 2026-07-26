@@ -41,6 +41,11 @@ organizadas por data.
   que os artefatos não eram versionados e precisavam ser copiados
   manualmente. A documentação passou a descrever o conteúdo já
   presente e a explicar o papel do `.gitignore`.
+- O exemplo de `PredictRequest` trazia apenas 4 preços, então o
+  "Try it out" do Swagger falhava com HTTP 422 no estado padrão. O
+  exemplo passou a conter os 61 fechamentos reais que o modelo atual
+  exige, e a descrição do campo `prices` aponta para o `min_prices`
+  do `/ready`.
 
 ## [2026-07-14]
 

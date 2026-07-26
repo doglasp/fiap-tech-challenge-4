@@ -7,14 +7,24 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class PredictRequest(BaseModel):
+    # O exemplo traz os 61 fechamentos que o modelo atual exige
+    # (janela de 60 + 1), para que o "Try it out" do Swagger funcione
+    # sem edição. São dados reais de AAPL, de 2026-03-24 a 2026-06-18.
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
                 "prices": [
-                    285.12,
-                    286.70,
-                    284.95,
-                    287.31,
+                    251.41, 252.39, 252.66, 248.57, 246.4, 253.56,
+                    255.39, 255.68, 258.62, 253.27, 258.66, 260.25,
+                    260.24, 258.96, 258.59, 266.18, 263.16, 269.98,
+                    272.8, 265.93, 272.92, 273.18, 270.81, 267.36,
+                    270.46, 269.92, 271.1, 279.88, 276.58, 283.92,
+                    287.25, 287.18, 293.05, 292.68, 294.8, 298.87,
+                    298.21, 300.23, 297.84, 298.97, 302.25, 304.99,
+                    308.82, 308.33, 310.85, 312.51, 312.06, 306.31,
+                    315.2, 310.26, 311.23, 307.34, 301.54, 290.55,
+                    291.58, 295.63, 291.13, 296.42, 299.24, 295.95,
+                    298.01,
                 ],
                 "horizon": 1,
             }
@@ -25,7 +35,9 @@ class PredictRequest(BaseModel):
         ...,
         min_length=2,
         description=(
-            "Fechamentos do mais antigo para o mais recente."
+            "Fechamentos do mais antigo para o mais recente. "
+            "A quantidade mínima depende da janela do modelo "
+            "carregado e é informada por /ready em 'min_prices'."
         ),
     )
     horizon: int = Field(
