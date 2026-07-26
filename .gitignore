@@ -27,3 +27,10 @@ grafana_data/
 
 # Relatórios/artefatos gerados localmente, não fazem parte do código
 *.pdf
+
+# Artefatos de inferência necessários para o deploy
+!artifacts/ret_scaler.pkl
+!artifacts/inference_meta.pkl
+!artifacts/metrics.pkl
+!artifacts/AAPL_clean.csv
+!models/lstm_final.keras
