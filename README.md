@@ -54,10 +54,16 @@ artifacts/
 ```
 
 A API utiliza o modelo, o scaler e os metadados. O `metrics.pkl`
-guarda as métricas de avaliação e o CSV serve aos exemplos e ao
-teste de carga.
+guarda a avaliação do modelo — métricas de preço, comparação com o
+baseline naïve e diagnósticos no espaço de retorno, descritos em
+[artifacts/README.md](artifacts/README.md) — e o CSV serve aos
+exemplos e ao teste de carga.
 
-Para regerá-los do zero, execute os notebooks 01 e 02 na ordem.
+Para regerá-los do zero, execute os notebooks 01 e 02 **nessa ordem**:
+o 01 concentra todo o pré-processamento e grava os arrays de treino
+que o 02 consome, sem repetir nenhuma transformação. Esses arrays
+intermediários não são versionados, então o 02 não roda sozinho num
+clone novo.
 
 ## 2. Execução local sem Docker
 

@@ -17,9 +17,34 @@ organizadas por data.
   clone, sem rodar os notebooks.
 - Este `CHANGELOG.md`, com o histórico reconstruído a partir dos
   commits anteriores.
+- Seção 8.1 do notebook 02, com diagnósticos no espaço de retorno:
+  acurácia direcional, R² contra prever zero, correlação entre
+  previsto e real, razão de desvios e proporção de altas. MAE, RMSE e
+  MAPE em preço são dominados por P_{k-1} e não distinguem uma rede
+  que aprendeu algo de uma que devolve sempre ~0.
+- Chaves `ganho_vs_naive_%`, `return_diagnostics` e `n_validacao` no
+  `artifacts/metrics.pkl`, documentadas em `artifacts/README.md`.
 
 ### Alterado
 
+- Todo o pré-processamento passou a viver no notebook 01. Antes o 01
+  escalonava preços com `MinMaxScaler` e gravava janelas que o 02
+  nunca lia: o 02 recarregava o CSV e refazia tudo com log-retorno e
+  `StandardScaler`. Eram dois pré-processamentos incompatíveis, e o
+  cabeçalho do 02 declarava como pré-requisito arquivos que ele não
+  abria.
+
+  O 01 agora calcula log-retorno, faz o split, ajusta o `ret_scaler` e
+  janela a série, gravando também `base_valid.npy`, `true_valid.npy` e
+  `valid_dates.npy` — os preços de referência e as datas que o 02
+  precisa para avaliar em escala real. O 02 apenas carrega os arrays e
+  treina. O `ret_scaler.pkl` passou a ser gravado pelo 01, que é quem o
+  ajusta; o 02 só o consome.
+
+  O modelo **não** foi retreinado: os arrays gerados pelo 01
+  refatorado são idênticos, elemento a elemento, aos que o 02
+  calculava internamente, e o `ret_scaler` reproduz o `mean_` e o
+  `scale_` do artefato já versionado.
 - Imagem de inferência trocou `tensorflow` por `tensorflow-cpu`, que
   não arrasta as bibliotecas CUDA da NVIDIA — inúteis, já que a API
   executa em CPU.
@@ -51,10 +76,27 @@ organizadas por data.
   que não ilustra o propósito do endpoint. O exemplo passou a usar o
   D+1 devolvido pelo exemplo de `PredictRequest` (297.71) contra um
   preço observado de 298.01, e os dois campos ganharam descrição.
+- A avaliação do notebook 02 decidia o resultado apenas pelo RMSE e
+  declarava que a LSTM superava o baseline com um ganho de 0,3%,
+  enquanto o modelo perde em MAE (-0,60%) e MAPE (-0,72%) para o
+  mesmo random walk. O veredito passou a comparar as três métricas em
+  conjunto e a nomear o empate: em 426 dias de validação, diferenças
+  abaixo de 1% são ruído.
+
+  Os diagnósticos explicam o resultado: a rede reproduz 22% da
+  volatilidade real e prevê alta em 75,6% dos dias contra 53,5% de
+  altas de fato, o que derruba a acurácia direcional para 48,7% —
+  abaixo do acaso. O modelo não foi retreinado, apenas reavaliado.
 - `make lint` falhava com quatro violações pré-existentes em `app/`
   (`UP037`, `UP035` e dois `I001`). Corrigidas: anotação de retorno
   sem aspas em `Settings.from_env`, `Iterable` importado de
   `collections.abc` e ordenação dos blocos de import.
+
+### Removido
+
+- `artifacts/scaler.pkl`, o `MinMaxScaler` sobre preços que o notebook
+  01 gravava e nenhuma etapa consumia desde que o alvo passou a ser o
+  log-retorno.
 
 ## [2026-07-14]
 
