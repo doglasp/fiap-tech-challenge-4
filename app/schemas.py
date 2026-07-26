@@ -46,7 +46,11 @@ class PredictRequest(BaseModel):
         ge=1,
         le=30,
         description=(
-            "Quantidade de dias previstos recursivamente."
+            "Quantidade de dias previstos recursivamente. Cada passo "
+            "realimenta a própria previsão, então o erro se acumula: "
+            "o MAPE na validação vai de 1,2% em D+1 para 3,1% em D+5 "
+            "e 5,9% em D+20, sem superar um baseline naïve em nenhum "
+            "horizonte. Reproduza com scripts/eval_horizon.py."
         ),
     )
     symbol: str | None = Field(

@@ -38,9 +38,20 @@ escalonado: sem os preços de referência não dá para reconstruir
 | `ganho_vs_naive_%` | ganho percentual da LSTM sobre o baseline, por métrica; negativo = pior |
 | `return_diagnostics` | acurácia direcional, R² contra prever zero, correlação, razão de desvios e proporção de altas |
 | `n_validacao` | número de dias avaliados |
+| `horizon_metrics` | erro da previsão recursiva por horizonte, indexado por `"1"`, `"2"`, `"3"`, `"5"`, `"10"` e `"20"` |
 | `best_hyperparams` | `units`, `dropout` e `lr` da configuração vencedora |
 
 Os diagnósticos de retorno existem porque MAE/RMSE/MAPE em preço são
 dominados por P_{k-1}: mesmo prevendo retorno zero o erro fica em torno
 de 1%, o que faz qualquer modelo parecer bom. As chaves do
 `return_diagnostics` medem o que a rede de fato prevê.
+
+O `horizon_metrics` existe porque a API aceita `horizon` até 30 e
+produz esses passos por recursão, enquanto `lstm` e `naive_baseline`
+cobrem apenas D+1. Cada horizonte traz `n`, `MAE`, `RMSE`, `MAPE`,
+`MAE_naive`, `MAPE_naive` e o par `variacao_prevista_%` /
+`variacao_real_%`, que compara o movimento projetado com o observado
+e quantifica o achatamento. O horizonte `"1"` reproduz os valores de
+`lstm`, o que serve de verificação. A seção 7.4 do notebook 02 gera
+essas chaves; `scripts/eval_horizon.py` recalcula tudo a partir do CSV
+versionado, sem depender dos intermediários.

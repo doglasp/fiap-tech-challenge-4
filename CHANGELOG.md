@@ -24,6 +24,18 @@ organizadas por data.
   que aprendeu algo de uma que devolve sempre ~0.
 - Chaves `ganho_vs_naive_%`, `return_diagnostics` e `n_validacao` no
   `artifacts/metrics.pkl`, documentadas em `artifacts/README.md`.
+- Seção 7.4 do notebook 02 e chave `horizon_metrics` no
+  `artifacts/metrics.pkl`, com o erro da previsão recursiva em D+1,
+  D+2, D+3, D+5, D+10 e D+20 sobre os mesmos 426 dias de validação.
+  Cada horizonte traz também o baseline naïve e o par
+  `variacao_prevista_%` / `variacao_real_%`.
+
+  O modelo **não** foi retreinado: a célula foi executada contra o
+  `lstm_final.keras` já versionado, e o horizonte 1 reproduz o MAE, o
+  RMSE e o MAPE que já estavam gravados, o que verifica a replicação.
+  As demais chaves do `metrics.pkl` seguem idênticas.
+- `scripts/eval_horizon.py`, que recalcula essas métricas a partir do
+  CSV versionado, sem depender dos intermediários do notebook 01.
 
 ### Alterado
 
@@ -49,6 +61,15 @@ organizadas por data.
   erro, mas as saídas gravadas neles ainda exibem o campo `symbol`
   antigo. Alinhá-los exige reexecutar os dois notebooks, e não apenas
   editar as células.
+- O campo `horizon` aceitava até 30 dias sem informar que a avaliação
+  cobria somente D+1. A descrição no Swagger e o README passaram a
+  registrar a degradação medida: MAPE de 1,2% em D+1, 3,1% em D+5 e
+  5,9% em D+20, sem superar o baseline naïve em nenhum horizonte.
+
+  O README traz ainda a comparação entre a variação projetada e a
+  variação real, que quantifica o achatamento: em D+5 o modelo prevê
+  0,71% de movimento contra 3,13% observados. A projeção longa é uma
+  deriva suave, não uma previsão da dinâmica do papel.
 - Todo o pré-processamento passou a viver no notebook 01. Antes o 01
   escalonava preços com `MinMaxScaler` e gravava janelas que o 02
   nunca lia: o 02 recarregava o CSV e refazia tudo com log-retorno e

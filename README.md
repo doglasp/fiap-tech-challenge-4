@@ -185,6 +185,44 @@ diferente da que viu no treino. A previsão é produzida mesmo assim,
 mas a divergência fica explícita na resposta e deve ser levada em
 conta na interpretação do resultado.
 
+### Sobre o campo `horizon`
+
+O modelo prevê **um** passo à frente. Horizontes maiores são obtidos
+por recursão: a previsão de D+1 entra na janela como se fosse um dia
+observado, e o processo se repete. O erro, portanto, se acumula.
+
+Medido sobre os mesmos 426 dias de validação do notebook 02:
+
+| Horizonte | MAPE | MAPE do naïve | Variação prevista | Variação real |
+|---|---|---|---|---|
+| D+1 | 1,19% | 1,19% | 0,21% | 1,19% |
+| D+2 | 1,78% | 1,78% | 0,36% | 1,78% |
+| D+3 | 2,27% | 2,29% | 0,49% | 2,28% |
+| D+5 | 3,09% | 3,13% | 0,71% | 3,13% |
+| D+10 | 4,20% | 4,23% | 1,32% | 4,25% |
+| D+20 | 5,89% | 5,93% | 2,68% | 6,03% |
+
+Duas leituras importam:
+
+- **O erro cresce aproximadamente com a raiz do horizonte**, o padrão
+  de um passeio aleatório, e o modelo não supera o baseline naïve em
+  nenhum horizonte.
+- **As duas últimas colunas quantificam o achatamento.** Em D+5 o
+  modelo projeta uma variação média de 0,71% enquanto o preço varia
+  3,13% de fato. A projeção longa é uma deriva suave, não uma
+  previsão da dinâmica do papel.
+
+Ou seja, `horizon` alto é aceito pela API, mas o resultado deve ser
+lido como tendência achatada, não como preço esperado. Os números
+acima são reproduzíveis:
+
+```bash
+python scripts/eval_horizon.py
+```
+
+O horizonte 1 do script reproduz o MAE, o RMSE e o MAPE gravados no
+`artifacts/metrics.pkl`, o que verifica a replicação do split.
+
 ### Feedback da previsão
 
 Quando o preço real estiver disponível, registre-o para acompanhar
