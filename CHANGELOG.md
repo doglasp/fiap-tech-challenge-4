@@ -6,7 +6,17 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/).
 O projeto ainda não usa tags de versão, portanto as entradas são
 organizadas por data.
 
-## [Não publicado]
+## [2026-07-26]
+
+### Adicionado
+
+- Modelo e artefatos de inferência versionados no repositório
+  (`models/lstm_final.keras`, `artifacts/ret_scaler.pkl`,
+  `artifacts/inference_meta.pkl`, `artifacts/metrics.pkl` e
+  `artifacts/AAPL_clean.csv`), permitindo executar a API logo após o
+  clone, sem rodar os notebooks.
+- Este `CHANGELOG.md`, com o histórico reconstruído a partir dos
+  commits anteriores.
 
 ### Alterado
 
@@ -17,23 +27,13 @@ organizadas por data.
   necessários somente para compilar ops customizadas) após o
   `pip install`.
 
-Imagem final em 1,64 GB, com 257 MB de memória residente em execução.
-Validado em container: healthcheck `healthy`, `/ready` com modelo e
-scaler carregados, `/metrics` exportando e `/predict` devolvendo os
-mesmos valores da imagem anterior.
+  Imagem final em 1,64 GB, com 257 MB de memória residente em
+  execução. Validado em container: healthcheck `healthy`, `/ready`
+  com modelo e scaler carregados, `/metrics` exportando e `/predict`
+  devolvendo os mesmos valores da imagem anterior.
 
-Os notebooks seguem instalando o `tensorflow` completo, já que o
-treino pode se beneficiar de GPU.
-
-## [2026-07-26]
-
-### Adicionado
-
-- Modelo e artefatos de inferência versionados no repositório
-  (`models/lstm_final.keras`, `artifacts/ret_scaler.pkl`,
-  `artifacts/inference_meta.pkl`, `artifacts/metrics.pkl` e
-  `artifacts/AAPL_clean.csv`), permitindo executar a API logo após o
-  clone, sem rodar os notebooks.
+  Os notebooks seguem instalando o `tensorflow` completo, já que o
+  treino pode se beneficiar de GPU.
 
 ### Corrigido
 
