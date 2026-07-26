@@ -19,7 +19,7 @@ class Settings:
     def from_env(cls) -> Settings:
         return cls(
             model_path=Path(
-                os.getenv("MODEL_PATH", "models/lstm_final.keras")
+                os.getenv("MODEL_PATH", "models/lstm_final.onnx")
             ),
             scaler_path=Path(
                 os.getenv("SCALER_PATH", "artifacts/ret_scaler.pkl")

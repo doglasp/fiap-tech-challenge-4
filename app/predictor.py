@@ -10,42 +10,20 @@ import joblib
 import numpy as np
 
 
-def _configure_tensorflow_threads(tf_module) -> None:
-    """Limita threads quando as variáveis de ambiente forem informadas."""
+def _session_options(ort_module):
+    """Aplica os limites de thread informados por variáveis de ambiente."""
 
-    intra = os.getenv("TF_NUM_INTRAOP_THREADS")
-    inter = os.getenv("TF_NUM_INTEROP_THREADS")
+    options = ort_module.SessionOptions()
+
+    intra = os.getenv("ORT_NUM_INTRAOP_THREADS")
+    inter = os.getenv("ORT_NUM_INTEROP_THREADS")
 
     if intra:
-        tf_module.config.threading.set_intra_op_parallelism_threads(
-            int(intra)
-        )
+        options.intra_op_num_threads = int(intra)
     if inter:
-        tf_module.config.threading.set_inter_op_parallelism_threads(
-            int(inter)
-        )
+        options.inter_op_num_threads = int(inter)
 
-
-def _build_inference_fn(tf_module, model, window: int):
-    """Compila a chamada do modelo para uma janela de tamanho fixo.
-
-    Chamar o modelo em modo eager custa centenas de milissegundos de
-    overhead por passo, o que a inferência recursiva multiplica pelo
-    horizonte. A assinatura fixa evita retracing entre requisições.
-    """
-
-    signature = [
-        tf_module.TensorSpec(
-            shape=(1, window, 1),
-            dtype=tf_module.float32,
-        )
-    ]
-
-    @tf_module.function(input_signature=signature)
-    def infer(model_input):
-        return model(model_input, training=False)
-
-    return infer
+    return options
 
 
 class Predictor:
@@ -77,15 +55,17 @@ class Predictor:
             )
 
         # O import é tardio para que testes com Predictor falso não
-        # precisem inicializar o TensorFlow.
-        import tensorflow as tf
-        from tensorflow.keras.models import load_model
-
-        _configure_tensorflow_threads(tf)
+        # precisem inicializar o runtime de inferência.
+        import onnxruntime as ort
 
         self.scaler = joblib.load(self.scaler_path)
         self.meta = joblib.load(self.metadata_path)
-        self.model = load_model(self.model_path, compile=False)
+        self.session = ort.InferenceSession(
+            str(self.model_path),
+            sess_options=_session_options(ort),
+            providers=["CPUExecutionProvider"],
+        )
+        self._input_name = self.session.get_inputs()[0].name
 
         self.window = int(self.meta["window_size"])
         self.symbol = self.meta.get("symbol")
@@ -100,7 +80,14 @@ class Predictor:
                 "O scaler não possui o método inverse_transform."
             )
 
-        self._infer = _build_inference_fn(tf, self.model, self.window)
+        janela_modelo = self.session.get_inputs()[0].shape[1]
+        if isinstance(janela_modelo, int) and janela_modelo != self.window:
+            raise ValueError(
+                f"O modelo espera janela {janela_modelo}, mas os metadados "
+                f"informam {self.window}. Reexporte com "
+                "scripts/export_onnx.py."
+            )
+
         self._lock = Lock() if serialize_inference else None
 
     @property
@@ -110,13 +97,20 @@ class Predictor:
         return self.window + 1
 
     def warm_up(self) -> None:
-        """Dispara o tracing do grafo antes da primeira requisição real."""
+        """Executa a primeira inferência antes da primeira requisição real."""
 
         sample = np.zeros((1, self.window, 1), dtype=np.float32)
         context = self._lock if self._lock is not None else nullcontext()
 
         with context:
             self._infer(sample)
+
+    def _infer(self, model_input: np.ndarray) -> float:
+        saida = self.session.run(
+            None,
+            {self._input_name: model_input},
+        )
+        return float(np.asarray(saida[0]).reshape(-1)[0])
 
     def predict(
         self,
@@ -159,21 +153,18 @@ class Predictor:
         last_price = float(recent[-1])
         context = self._lock if self._lock is not None else nullcontext()
 
-        # A serialização reduz riscos de concorrência no runtime do
-        # TensorFlow. Para maior vazão, escale réplicas da API.
+        # A serialização protege a sessão de chamadas concorrentes. Para
+        # maior vazão, escale réplicas da API.
         with context:
             for _ in range(int(horizon)):
-                # float32 é exigido pela assinatura do grafo compilado;
-                # os pesos já são float32, então não há perda adicional.
+                # O grafo exportado espera float32; os pesos já são
+                # float32, então não há perda adicional.
                 model_input = window_scaled.reshape(
                     1,
                     self.window,
                     1,
                 ).astype(np.float32)
-                prediction_tensor = self._infer(model_input)
-                scaled_return = float(
-                    np.asarray(prediction_tensor).reshape(-1)[0]
-                )
+                scaled_return = self._infer(model_input)
                 predicted_return = float(
                     self.scaler.inverse_transform(
                         [[scaled_return]]

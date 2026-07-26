@@ -34,3 +34,6 @@ grafana_data/
 !artifacts/metrics.pkl
 !artifacts/AAPL_clean.csv
 !models/lstm_final.keras
+# Modelo servido pela API; gerado a partir do .keras por
+# scripts/export_onnx.py
+!models/lstm_final.onnx
