@@ -36,6 +36,13 @@ organizadas por data.
   As demais chaves do `metrics.pkl` seguem idênticas.
 - `scripts/eval_horizon.py`, que recalcula essas métricas a partir do
   CSV versionado, sem depender dos intermediários do notebook 01.
+- Seção "Como ler as métricas publicadas" no README, registrando que
+  não há conjunto de teste independente: a mesma validação serve ao
+  early stopping, à escolha dos hiperparâmetros e ao reporte final,
+  o que torna as métricas otimistas por construção. O efeito é
+  limitado porque o modelo não supera o baseline naïve, mas os
+  valores devem ser lidos como limite superior, não como estimativa
+  imparcial.
 
 ### Alterado
 

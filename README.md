@@ -87,6 +87,27 @@ O script converte o `.keras` e verifica a equivalência em 512 janelas
 aleatórias, abortando se a diferença passar de `1e-4`. Na versão atual
 a diferença máxima é de `3.7e-07`.
 
+### Como ler as métricas publicadas
+
+Os números do `metrics.pkl` e das tabelas deste README vêm de uma
+divisão em **treino e validação**, sem um terceiro conjunto de teste.
+A mesma validação foi usada para três coisas: interromper o treino
+(*early stopping*), escolher os hiperparâmetros e reportar o
+resultado final.
+
+Isso significa que as métricas são **otimistas por construção**: o
+modelo teve contato indireto com esses dados durante o
+desenvolvimento, então o erro medido tende a ser menor do que seria
+em dados inéditos. Reportar sobre um conjunto de teste isolado, nunca
+tocado na seleção, exigiria refazer o split e retreinar.
+
+Na prática o efeito aqui é limitado, porque a busca de
+hiperparâmetros foi pequena e o modelo **não supera o baseline
+naïve** em nenhuma das métricas de preço — um conjunto de teste
+independente dificilmente mudaria essa conclusão, apenas a tornaria
+formalmente correta. Ainda assim, os valores devem ser lidos como
+limite superior de desempenho, não como estimativa imparcial.
+
 ## 2. Execução local sem Docker
 
 Requer Python 3.12.
