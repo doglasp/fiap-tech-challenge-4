@@ -10,6 +10,13 @@ organizadas por data.
 
 ### Adicionado
 
+- Seção "Resultados" no README, reunindo a arquitetura da rede, o
+  protocolo de treino, a busca de hiperparâmetros, o erro em D+1
+  contra o baseline naïve e os diagnósticos no espaço de retorno. Os
+  números vêm do `artifacts/metrics.pkl` e das saídas do notebook 02;
+  antes só existiam dentro dos notebooks. A subseção "Como ler as
+  métricas publicadas" passou da seção 1 para essa nova seção, junto
+  dos resultados que ela qualifica.
 - Modelo e artefatos de inferência versionados no repositório
   (`models/lstm_final.keras`, `artifacts/ret_scaler.pkl`,
   `artifacts/inference_meta.pkl`, `artifacts/metrics.pkl` e

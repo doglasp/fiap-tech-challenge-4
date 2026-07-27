@@ -37,6 +37,127 @@ preço_previsto = preço_anterior × exp(retorno_previsto)
 └── requirements-dev.txt
 ```
 
+## Resultados
+
+### Arquitetura
+
+Rede sequencial de **66.273 parâmetros**, que recebe uma janela de 60
+log-retornos normalizados e devolve o log-retorno do dia seguinte:
+
+| Camada | Saída | Observação |
+|---|---|---|
+| `Input` | (60, 1) | janela de 60 pregões |
+| `LSTM(96)` | (60, 96) | `return_sequences=True` |
+| `Dropout(0.2)` | (60, 96) | |
+| `LSTM(48)` | (48,) | `return_sequences=False` |
+| `Dropout(0.2)` | (48,) | |
+| `Dense(16, relu)` | (16,) | |
+| `Dense(1)` | (1,) | log-retorno na escala do `StandardScaler` |
+
+O preço só aparece na reconstrução, fora da rede:
+`preço_previsto = preço_anterior × exp(retorno_previsto)`.
+
+### Treino
+
+AAPL de 2018-01-01 a 2026-06-20, divisão **temporal** 80/20 sem
+embaralhar: 1.640 janelas de treino e 426 de validação, esta cobrindo
+de 2024-10-07 a 2026-06-18. O `StandardScaler` foi ajustado **apenas
+no treino**, para não vazar a distribuição futura.
+
+Otimizador Adam com MSE, `batch_size=32`, `shuffle=False`,
+`EarlyStopping` (paciência 15, restaurando os melhores pesos) e
+`ReduceLROnPlateau`. O treino final parou na época 28 de 100.
+
+A busca de hiperparâmetros comparou quatro configurações pela
+`val_loss`, e as quatro ficaram dentro de 0,6% umas das outras:
+
+| units | dropout | lr | val_loss | RMSE (preço) |
+|---|---|---|---|---|
+| **(96, 48)** | **0,2** | **1e-3** | **0,83044** | 4,045 |
+| (64, 32) | 0,3 | 5e-4 | 0,83075 | 4,035 |
+| (32, 16) | 0,2 | 1e-3 | 0,83290 | 4,055 |
+| (64, 32) | 0,2 | 1e-3 | 0,83568 | 4,044 |
+
+O empate entre arquiteturas de tamanhos bem diferentes já é o primeiro
+sinal de que a capacidade da rede não é o fator limitante.
+
+### Erro em D+1 contra o baseline
+
+Baseline naïve (*random walk*): prever que amanhã repete o preço de
+hoje. Medido nos 426 dias de validação:
+
+| Métrica | LSTM | Naïve | Ganho |
+|---|---|---|---|
+| MAE | 2,827 | **2,810** | −0,60% |
+| RMSE | **4,045** | 4,058 | +0,31% |
+| MAPE | 1,195% | **1,186%** | −0,72% |
+
+**O modelo não supera o baseline.** Ganha 0,31% em RMSE, perde em MAE
+e MAPE, e as três diferenças estão bem dentro do ruído amostral. Para
+a previsão de um dia à frente, repetir o último preço é tão bom quanto
+a LSTM treinada.
+
+### Diagnóstico no espaço de retorno
+
+As métricas de preço escondem o comportamento real da rede, porque o
+preço de ontem domina o de hoje. Avaliando diretamente o log-retorno
+previsto:
+
+| Diagnóstico | Valor | Leitura |
+|---|---|---|
+| R² contra prever zero | +1,9% | mal distingue de prever "sem variação" |
+| Correlação previsto × real | 0,151 | sinal fraco, mas não nulo |
+| Acurácia direcional | 48,7% | **abaixo do acaso** |
+| Previsões de alta | 75,6% | contra 53,5% de altas reais |
+| Desvio previsto ÷ desvio real | 0,218 | reproduz 22% da volatilidade |
+
+Os três últimos explicam o resultado. A rede aprendeu a **encolher as
+previsões em direção à média** — produz retornos pequenos e quase
+sempre positivos, o que reflete a alta do papel no período de treino,
+não a dinâmica de cada dia. Isso rende um R² levemente positivo (errar
+pouco por prever quase zero) e ao mesmo tempo uma acurácia direcional
+abaixo de 50%: acerta o sinal por viés, não por informação.
+
+O mesmo achatamento aparece nos horizontes maiores, onde o modelo
+projeta 0,71% de variação em D+5 contra 3,13% reais — ver
+[Sobre o campo `horizon`](#sobre-o-campo-horizon).
+
+### Conclusão
+
+O resultado honesto é que **preços diários de ações não são previsíveis
+por esta abordagem**, o que é consistente com a literatura de mercados
+eficientes. A entrega vale pelo pipeline — coleta, pré-processamento
+sem vazamento, treino reprodutível, exportação para ONNX, API,
+monitoramento — e pela avaliação que expõe a limitação em vez de
+escondê-la atrás de um gráfico de preço previsto sobreposto ao real,
+que sempre parece bom quando o alvo é o preço.
+
+Melhorar de verdade exigiria mudar o problema, não a rede: prever
+volatilidade ou direção em vez de preço, agregar em horizontes mais
+longos, ou trazer variáveis externas (volume, setor, índices,
+fundamentos).
+
+### Como ler as métricas publicadas
+
+Os números do `metrics.pkl` e das tabelas deste README vêm de uma
+divisão em **treino e validação**, sem um terceiro conjunto de teste.
+A mesma validação foi usada para três coisas: interromper o treino
+(*early stopping*), escolher os hiperparâmetros e reportar o
+resultado final.
+
+Isso significa que as métricas são **otimistas por construção**: o
+modelo teve contato indireto com esses dados durante o
+desenvolvimento, então o erro medido tende a ser menor do que seria
+em dados inéditos. Reportar sobre um conjunto de teste isolado, nunca
+tocado na seleção, exigiria refazer o split e retreinar.
+
+Na prática o efeito aqui é limitado, porque a busca de
+hiperparâmetros foi pequena e o modelo **não supera o baseline
+naïve** em nenhuma das métricas de preço — um conjunto de teste
+independente dificilmente mudaria essa conclusão, apenas a tornaria
+formalmente correta. Ainda assim, os valores devem ser lidos como
+limite superior de desempenho, não como estimativa imparcial.
+
 ## 1. Modelo e artefatos
 
 Os arquivos abaixo já vêm versionados no repositório, então basta
@@ -67,7 +188,8 @@ inferência, o que tira o TensorFlow da imagem de produção:
 O `metrics.pkl` guarda a avaliação do modelo — métricas de preço,
 comparação com o baseline naïve e diagnósticos no espaço de retorno,
 descritos em [artifacts/README.md](artifacts/README.md) — e o CSV
-serve aos exemplos e ao teste de carga.
+serve aos exemplos e ao teste de carga. A leitura desses números está
+em [Resultados](#resultados).
 
 Para regerá-los do zero, execute os notebooks 01 e 02 **nessa ordem**:
 o 01 concentra todo o pré-processamento e grava os arrays de treino
@@ -86,27 +208,6 @@ python scripts/export_onnx.py
 O script converte o `.keras` e verifica a equivalência em 512 janelas
 aleatórias, abortando se a diferença passar de `1e-4`. Na versão atual
 a diferença máxima é de `3.7e-07`.
-
-### Como ler as métricas publicadas
-
-Os números do `metrics.pkl` e das tabelas deste README vêm de uma
-divisão em **treino e validação**, sem um terceiro conjunto de teste.
-A mesma validação foi usada para três coisas: interromper o treino
-(*early stopping*), escolher os hiperparâmetros e reportar o
-resultado final.
-
-Isso significa que as métricas são **otimistas por construção**: o
-modelo teve contato indireto com esses dados durante o
-desenvolvimento, então o erro medido tende a ser menor do que seria
-em dados inéditos. Reportar sobre um conjunto de teste isolado, nunca
-tocado na seleção, exigiria refazer o split e retreinar.
-
-Na prática o efeito aqui é limitado, porque a busca de
-hiperparâmetros foi pequena e o modelo **não supera o baseline
-naïve** em nenhuma das métricas de preço — um conjunto de teste
-independente dificilmente mudaria essa conclusão, apenas a tornaria
-formalmente correta. Ainda assim, os valores devem ser lidos como
-limite superior de desempenho, não como estimativa imparcial.
 
 ## 2. Execução local sem Docker
 
