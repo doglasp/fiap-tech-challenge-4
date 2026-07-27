@@ -46,6 +46,21 @@ organizadas por data.
 
 ### Alterado
 
+- Notebooks 03 e 04 passaram a usar ONNX Runtime nas cópias internas do
+  `Predictor`, acompanhando `app/predictor.py`. Antes mediam o
+  TensorFlow em modo eager, então os números de latência do 04 não
+  correspondiam ao que roda em produção. Reexecutados: o notebook 04
+  agora registra 147 a 242 req/s de 1 a 10 de concorrência, com p95
+  entre 10 e 50 ms e zero erros.
+- Notebook 02 ganhou a seção 9, que exporta o modelo para ONNX ao fim
+  do treino chamando `scripts/export_onnx.py`. Sem ela, retreinar
+  deixaria a API servindo a versão anterior em silêncio, sem nenhum
+  erro visível.
+- A célula do notebook 04 que gera os arquivos de `monitoring/` passou
+  a preservar o que já existe, em vez de sobrescrever. Os arquivos
+  versionados evoluíram além do que está embutido no notebook — uma
+  reexecução apagava cinco regras de alerta e os onze painéis do
+  dashboard.
 - A API passou a servir o modelo em **ONNX** em vez de TensorFlow. O
   `.keras` continua sendo o artefato de origem, treinado pelo notebook
   02; o `models/lstm_final.onnx` é derivado dele e é o que o
